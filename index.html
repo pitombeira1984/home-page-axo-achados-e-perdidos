@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>AXO · Achados e Perdidos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="shortcut icon" href="#" type="image/x-icon">
+</head>
+<body>
+    <div class="app-container">
+        <!-- CABEÇALHO COM GRADIENTE -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">🔍</div>
+                    <div class="logo-text">AXO</div>
+                </div>
+                <p class="tagline">Achados e Perdidos · Gestão Inteligente</p>
+            </div>
+            <div class="header-bg-gradient"></div>
+        </header>
+
+        <!-- PAINEL DE ESTATÍSTICAS RÁPIDAS -->
+        <div class="stats-panel">
+            <div class="stat-card">
+                <span class="stat-number" id="totalItems">0</span>
+                <span class="stat-label">Objetos registrados</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number" id="pendingItems">0</span>
+                <span class="stat-label">Aguardando devolução</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number" id="returnedItems">0</span>
+                <span class="stat-label">Já devolvidos</span>
+            </div>
+        </div>
+
+        <!-- AÇÕES PRINCIPAIS + BOTÕES -->
+        <div class="action-bar">
+            <div class="action-buttons-group">
+                <button class="btn btn-primary" id="openRegisterBtn">
+                    <span>+</span> Registrar objeto
+                </button>
+                <button class="btn btn-history" id="historyBtn">
+                    <span>📋</span> Histórico
+                </button>
+                <button class="btn btn-backup" id="backupBtn">
+                    <span>💾</span> Backup
+                </button>
+                <button class="btn btn-blackout" id="blackoutBtn">
+                    <span>⚠️</span> Blackout
+                </button>
+            </div>
+            <div class="search-filter">
+                <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="searchInput" placeholder="Buscar por nome, local ou descrição...">
+                </div>
+                <select id="categoryFilter" class="filter-select">
+                    <option value="all">Todas categorias</option>
+                    <option value="Eletrônicos">📱 Eletrônicos</option>
+                    <option value="Documentos">📄 Documentos</option>
+                    <option value="Acessórios">🕶️ Acessórios</option>
+                    <option value="Roupas">👕 Roupas</option>
+                    <option value="Outros">📦 Outros</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- LISTAGEM DE OBJETOS (CARDS) -->
+        <div class="items-grid" id="itemsGrid">
+            <div class="empty-state" id="emptyState">
+                <div class="empty-icon">📭</div>
+                <h3>Nenhum objeto encontrado</h3>
+                <p>Registre o primeiro item perdido ou achado no seu estabelecimento.</p>
+                <button class="btn btn-outline" id="emptyStateBtn">+ Novo registro</button>
+            </div>
+        </div>
+
+        <!-- MODAL DE CADASTRO/EDIÇÃO -->
+        <div class="modal" id="itemModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modalTitle">Registrar objeto</h2>
+                    <button class="modal-close" id="closeModalBtn">&times;</button>
+                </div>
+                <form id="itemForm">
+                    <input type="hidden" id="itemId">
+                    <div class="form-group">
+                        <label>Nome do objeto *</label>
+                        <input type="text" id="itemName" required placeholder="Ex: iPhone 13, Carteira, Mochila...">
+                    </div>
+                    <div class="form-group">
+                        <label>Categoria *</label>
+                        <select id="itemCategory" required>
+                            <option value="">Selecione</option>
+                            <option value="Eletrônicos">📱 Eletrônicos</option>
+                            <option value="Documentos">📄 Documentos</option>
+                            <option value="Acessórios">🕶️ Acessórios</option>
+                            <option value="Roupas">👕 Roupas</option>
+                            <option value="Outros">📦 Outros</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Local onde foi encontrado *</label>
+                        <input type="text" id="itemLocation" required placeholder="Ex: Praça de alimentação, estacionamento, sala 203...">
+                    </div>
+                    <div class="form-group">
+                        <label>Descrição detalhada</label>
+                        <textarea id="itemDescription" rows="3" placeholder="Cor, marca, detalhes que ajudem na identificação..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Data de encontro</label>
+                        <input type="date" id="itemDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="itemStatus">
+                            <option value="pending">Aguardando devolução</option>
+                            <option value="returned">Devolvido ao dono</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelModalBtn">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Salvar objeto</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- MODAL DE HISTÓRICO -->
+        <div class="modal" id="historyModal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2>📋 Histórico de Ações</h2>
+                    <button class="modal-close" id="closeHistoryBtn">&times;</button>
+                </div>
+                <div class="history-filters">
+                    <input type="text" id="historySearch" placeholder="Filtrar histórico..." class="history-search">
+                    <select id="historyTypeFilter" class="history-filter-select">
+                        <option value="all">Todas ações</option>
+                        <option value="create">➕ Criações</option>
+                        <option value="edit">✏️ Edições</option>
+                        <option value="delete">🗑️ Exclusões</option>
+                        <option value="status">🔄 Mudanças de status</option>
+                        <option value="blackout">⚠️ Blackout</option>
+                        <option value="backup">💾 Backup</option>
+                    </select>
+                    <button class="btn btn-secondary" id="clearHistoryBtn">Limpar histórico</button>
+                </div>
+                <div class="history-stats">
+                    <span>📊 Total de registros: <strong id="historyTotalCount">0</strong></span>
+                    <span>📅 Última semana: <strong id="historyWeekCount">0</strong></span>
+                </div>
+                <div class="history-list" id="historyList"></div>
+            </div>
+        </div>
+
+        <!-- MODAL DE BLACKOUT -->
+        <div class="modal" id="blackoutModal">
+            <div class="modal-content">
+                <div class="modal-header blackout-header">
+                    <h2>⚠️ MODO BLACKOUT</h2>
+                    <button class="modal-close" id="closeBlackoutBtn">&times;</button>
+                </div>
+                <div class="blackout-content">
+                    <div class="blackout-icon">🔒</div>
+                    <p class="blackout-message">
+                        O sistema está em <strong>modo de emergência</strong>. 
+                        Apenas leitura permitida. Novos registros, edições e exclusões 
+                        estão temporariamente bloqueados.
+                    </p>
+                    <div class="blackout-reason">
+                        <label>Motivo do Blackout (opcional):</label>
+                        <textarea id="blackoutReason" rows="3" placeholder="Ex: Manutenção programada, investigação de itens, etc..."></textarea>
+                    </div>
+                    <div class="blackout-actions">
+                        <button class="btn btn-secondary" id="exitBlackoutBtn">🔓 Desativar Blackout</button>
+                        <button class="btn btn-primary" id="confirmBlackoutBtn">⚠️ Ativar Blackout</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DE BACKUP -->
+        <div class="modal" id="backupModal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2>💾 Sistema de Backup e Restauração</h2>
+                    <button class="modal-close" id="closeBackupBtn">&times;</button>
+                </div>
+                <div class="backup-container">
+                    <div class="backup-section">
+                        <h3>📤 Exportar Dados</h3>
+                        <p>Faça backup completo do sistema incluindo objetos e histórico de ações.</p>
+                        <div class="backup-options">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="exportItems" checked> Objetos cadastrados
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="exportHistory" checked> Histórico de ações
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="exportSettings" checked> Configurações (Blackout)
+                            </label>
+                        </div>
+                        <div class="backup-actions">
+                            <button class="btn btn-primary" id="exportBackupBtn">💾 Baixar Backup</button>
+                            <button class="btn btn-secondary" id="exportFullBackupBtn">📦 Backup Completo</button>
+                        </div>
+                    </div>
+
+                    <div class="backup-section">
+                        <h3>📥 Restaurar Backup</h3>
+                        <p>Restaura dados a partir de um arquivo de backup JSON.</p>
+                        <div class="restore-warning">
+                            ⚠️ ATENÇÃO: A restauração irá SUBSTITUIR todos os dados atuais!
+                        </div>
+                        <input type="file" id="restoreFileInput" accept=".json" style="display: none;">
+                        <div class="backup-actions">
+                            <button class="btn btn-primary" id="selectRestoreBtn">📂 Selecionar arquivo</button>
+                            <button class="btn btn-danger" id="confirmRestoreBtn" disabled>⚠️ Restaurar Backup</button>
+                        </div>
+                        <div id="selectedFileInfo" class="selected-file-info"></div>
+                    </div>
+
+                    <div class="backup-section">
+                        <h3>🔄 Backup Automático</h3>
+                        <p>Configure backups automáticos periódicos.</p>
+                        <div class="auto-backup-config">
+                            <label>
+                                <input type="checkbox" id="autoBackupEnable"> Ativar backup automático
+                            </label>
+                            <select id="autoBackupInterval" disabled>
+                                <option value="3600000">A cada 1 hora</option>
+                                <option value="21600000">A cada 6 horas</option>
+                                <option value="43200000">A cada 12 horas</option>
+                                <option value="86400000">A cada 24 horas</option>
+                                <option value="604800000">A cada semana</option>
+                            </select>
+                        </div>
+                        <div class="backup-list">
+                            <h4>Backups automáticos salvos:</h4>
+                            <div id="backupFilesList"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DE CONFIRMAÇÃO DE RESTAURAÇÃO -->
+        <div class="modal" id="restoreConfirmModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>⚠️ Confirmar Restauração</h2>
+                    <button class="modal-close" id="closeRestoreConfirmBtn">&times;</button>
+                </div>
+                <div class="restore-preview">
+                    <h3>Pré-visualização do Backup:</h3>
+                    <div id="restorePreview"></div>
+                    <div class="restore-warning">
+                        <strong>⚠️ Esta ação é irreversível!</strong><br>
+                        Todos os dados atuais serão substituídos pelo backup selecionado.
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" id="cancelRestoreBtn">Cancelar</button>
+                        <button class="btn btn-danger" id="executeRestoreBtn">Confirmar Restauração</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- INDICADOR DE LOADING -->
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+            <div class="loading-spinner"></div>
+            <p>Processando... Aguarde</p>
+        </div>
+
+        <!-- INDICADOR VISUAL DE BLACKOUT -->
+        <div id="blackoutOverlay" class="blackout-overlay" style="display: none;">
+            <div class="blackout-badge">
+                <span>⚠️ MODO BLACKOUT ATIVO</span>
+                <small>Sistema em manutenção / emergência</small>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
