@@ -1,9 +1,8 @@
 // ===== AXO - Sistema de Achados e Perdidos =====
-// Versão completa com Histórico Detalhado + Backup + Blackout
+// Versão completa com Histórico Detalhado + Backup
 
 let itemsDatabase = [];
 let historyDatabase = [];
-let blackoutActive = false;
 let autoBackupInterval = null;
 let currentUser = 'admin';
 
@@ -47,12 +46,6 @@ async function loadDatabase() {
             addToHistory('create', 'Sistema inicializado com dados de exemplo', null, { itemsCount: itemsDatabase.length });
         }
         
-        const savedBlackout = localStorage.getItem('axo_blackout');
-        if (savedBlackout) {
-            blackoutActive = JSON.parse(savedBlackout);
-            if (blackoutActive) activateBlackoutUI();
-        }
-        
         setupAutoBackup();
         updateStatsAndRender();
         loadAutoBackupList();
@@ -68,7 +61,6 @@ function saveDatabase() {
     setTimeout(() => {
         localStorage.setItem('axo_items', JSON.stringify(itemsDatabase));
         localStorage.setItem('axo_history', JSON.stringify(historyDatabase));
-        localStorage.setItem('axo_blackout', JSON.stringify(blackoutActive));
     }, 0);
 }
 
@@ -166,12 +158,12 @@ function renderHistory() {
 }
 
 function getTypeIcon(type) {
-    const icons = { 'create': '➕', 'edit': '✏️', 'delete': '🗑️', 'status': '🔄', 'blackout': '⚠️', 'backup': '💾' };
+    const icons = { 'create': '➕', 'edit': '✏️', 'delete': '🗑️', 'status': '🔄', 'backup': '💾' };
     return icons[type] || '📝';
 }
 
 function getTypeName(type) {
-    const names = { 'create': 'CRIAÇÃO', 'edit': 'EDIÇÃO', 'delete': 'EXCLUSÃO', 'status': 'STATUS', 'blackout': 'BLACKOUT', 'backup': 'BACKUP' };
+    const names = { 'create': 'CRIAÇÃO', 'edit': 'EDIÇÃO', 'delete': 'EXCLUSÃO', 'status': 'STATUS', 'backup': 'BACKUP' };
     return names[type] || 'AÇÃO';
 }
 
@@ -190,7 +182,7 @@ async function exportBackup(includeItems = true, includeHistory = true, includeS
         
         if (includeItems) backup.data.items = itemsDatabase;
         if (includeHistory) backup.data.history = historyDatabase;
-        if (includeSettings) backup.data.settings = { blackoutActive };
+        if (includeSettings) backup.data.settings = {};
         
         const backupJson = JSON.stringify(backup, null, 2);
         const blob = new Blob([backupJson], { type: 'application/json' });
@@ -233,7 +225,6 @@ async function importBackup(file) {
                 <p><strong>📦 Versão:</strong> ${backup.version}</p>
                 <p><strong>📊 Itens:</strong> ${backup.data.items?.length || 0} objetos</p>
                 <p><strong>📋 Histórico:</strong> ${backup.data.history?.length || 0} registros</p>
-                <p><strong>⚙️ Configurações:</strong> ${backup.data.settings ? 'Incluídas' : 'Não incluídas'}</p>
             </div>
         `;
         
@@ -260,11 +251,6 @@ async function executeRestore() {
         
         if (backup.data.items) itemsDatabase = backup.data.items;
         if (backup.data.history) historyDatabase = backup.data.history;
-        if (backup.data.settings) {
-            blackoutActive = backup.data.settings.blackoutActive;
-            if (blackoutActive) activateBlackoutUI();
-            else deactivateBlackoutUI();
-        }
         
         saveDatabase();
         updateStatsAndRender();
@@ -290,16 +276,16 @@ function setupAutoBackup() {
     const autoBackupIntervalValue = parseInt(localStorage.getItem('axo_auto_backup_interval') || '86400000');
     
     const autoBackupEnable = document.getElementById('autoBackupEnable');
-    const autoBackupInterval = document.getElementById('autoBackupInterval');
+    const autoBackupIntervalSelect = document.getElementById('autoBackupInterval');
     
     if (autoBackupEnable) {
         autoBackupEnable.checked = autoBackupEnabled;
         if (autoBackupEnabled) startAutoBackup(autoBackupIntervalValue);
     }
     
-    if (autoBackupInterval) {
-        autoBackupInterval.value = autoBackupIntervalValue;
-        autoBackupInterval.disabled = !autoBackupEnabled;
+    if (autoBackupIntervalSelect) {
+        autoBackupIntervalSelect.value = autoBackupIntervalValue;
+        autoBackupIntervalSelect.disabled = !autoBackupEnabled;
     }
 }
 
@@ -330,7 +316,7 @@ async function performAutoBackup() {
         data: {
             items: itemsDatabase,
             history: historyDatabase.slice(0, 100),
-            settings: { blackoutActive }
+            settings: {}
         }
     };
     
@@ -429,25 +415,21 @@ function renderItems() {
             <div class="item-detail"><span>📍</span> <span>${escapeHtml(item.location)}</span></div>
             <div class="item-detail"><span>📅</span> <span>${formatDate(item.date)}</span></div>
             <div class="card-actions">
-                <button class="btn btn-secondary edit-item" data-id="${item.id}" ${blackoutActive ? 'disabled' : ''}>✏️ Editar</button>
-                <button class="btn ${item.status === 'pending' ? 'btn-primary' : 'btn-secondary'} toggle-status" data-id="${item.id}" ${blackoutActive ? 'disabled' : ''}>${item.status === 'pending' ? '✓ Marcar devolvido' : '↩️ Reabrir'}</button>
-                <button class="btn btn-secondary delete-item" data-id="${item.id}" ${blackoutActive ? 'disabled' : ''}>🗑️</button>
+                <button class="btn btn-secondary edit-item" data-id="${item.id}">✏️ Editar</button>
+                <button class="btn ${item.status === 'pending' ? 'btn-primary' : 'btn-secondary'} toggle-status" data-id="${item.id}">${item.status === 'pending' ? '✓ Marcar devolvido' : '↩️ Reabrir'}</button>
+                <button class="btn btn-secondary delete-item" data-id="${item.id}">🗑️</button>
             </div>
         `;
         grid.appendChild(card);
     });
     
-    if (!blackoutActive) {
-        document.querySelectorAll('.edit-item').forEach(btn => btn.addEventListener('click', (e) => openEditModal(btn.getAttribute('data-id'))));
-        document.querySelectorAll('.toggle-status').forEach(btn => btn.addEventListener('click', (e) => toggleItemStatus(btn.getAttribute('data-id'))));
-        document.querySelectorAll('.delete-item').forEach(btn => btn.addEventListener('click', (e) => { if (confirm('Tem certeza?')) deleteItem(btn.getAttribute('data-id')); }));
-    }
+    document.querySelectorAll('.edit-item').forEach(btn => btn.addEventListener('click', (e) => openEditModal(btn.getAttribute('data-id'))));
+    document.querySelectorAll('.toggle-status').forEach(btn => btn.addEventListener('click', (e) => toggleItemStatus(btn.getAttribute('data-id'))));
+    document.querySelectorAll('.delete-item').forEach(btn => btn.addEventListener('click', (e) => { if (confirm('Tem certeza?')) deleteItem(btn.getAttribute('data-id')); }));
 }
 
 // ===== CRUD =====
 function saveItem(itemData) {
-    if (blackoutActive) { showTemporaryMessage('❌ Sistema em BLACKOUT!', 'error'); return; }
-    
     if (itemData.id) {
         const index = itemsDatabase.findIndex(i => i.id === itemData.id);
         if (index !== -1) {
@@ -475,7 +457,6 @@ function getChanges(oldObj, newObj) {
 }
 
 function deleteItem(id) {
-    if (blackoutActive) { showTemporaryMessage('❌ Sistema em BLACKOUT!', 'error'); return; }
     const item = itemsDatabase.find(i => i.id === id);
     if (item) {
         itemsDatabase = itemsDatabase.filter(i => i.id !== id);
@@ -487,7 +468,6 @@ function deleteItem(id) {
 }
 
 function toggleItemStatus(id) {
-    if (blackoutActive) { showTemporaryMessage('❌ Sistema em BLACKOUT!', 'error'); return; }
     const item = itemsDatabase.find(i => i.id === id);
     if (item) {
         const oldStatus = item.status;
@@ -499,42 +479,8 @@ function toggleItemStatus(id) {
     }
 }
 
-// ===== BLACKOUT =====
-function activateBlackout(reason = null) {
-    blackoutActive = true;
-    saveDatabase();
-    activateBlackoutUI();
-    addToHistory('blackout', `MODO BLACKOUT ATIVADO${reason ? ` - Motivo: ${reason}` : ''}`, null, { reason });
-    showTemporaryMessage('⚠️ BLACKOUT ATIVADO!', 'warning');
-}
-
-function deactivateBlackout() {
-    blackoutActive = false;
-    saveDatabase();
-    deactivateBlackoutUI();
-    addToHistory('blackout', 'MODO BLACKOUT DESATIVADO', null);
-    showTemporaryMessage('🔓 Blackout desativado.', 'success');
-}
-
-function activateBlackoutUI() {
-    const overlay = document.getElementById('blackoutOverlay');
-    if (overlay) overlay.style.display = 'block';
-    document.body.classList.add('blackout-mode');
-    const registerBtn = document.getElementById('openRegisterBtn');
-    if (registerBtn) registerBtn.disabled = true;
-}
-
-function deactivateBlackoutUI() {
-    const overlay = document.getElementById('blackoutOverlay');
-    if (overlay) overlay.style.display = 'none';
-    document.body.classList.remove('blackout-mode');
-    const registerBtn = document.getElementById('openRegisterBtn');
-    if (registerBtn) registerBtn.disabled = false;
-}
-
 // ===== MODAIS =====
 function openModal(editMode = false, itemData = null) {
-    if (blackoutActive && !editMode) { showTemporaryMessage('❌ BLACKOUT ativo!', 'error'); return; }
     if (editMode && itemData) {
         document.getElementById('modalTitle').textContent = '✏️ Editar objeto';
         document.getElementById('itemId').value = itemData.id;
@@ -599,10 +545,6 @@ document.getElementById('executeRestoreBtn')?.addEventListener('click', executeR
 document.getElementById('closeRestoreConfirmBtn')?.addEventListener('click', () => { document.getElementById('restoreConfirmModal').classList.remove('active'); window.tempBackup = null; });
 document.getElementById('autoBackupEnable')?.addEventListener('change', (e) => { if (e.target.checked) startAutoBackup(parseInt(document.getElementById('autoBackupInterval').value)); else stopAutoBackup(); });
 document.getElementById('autoBackupInterval')?.addEventListener('change', (e) => { if (document.getElementById('autoBackupEnable').checked) { stopAutoBackup(); startAutoBackup(parseInt(e.target.value)); } });
-document.getElementById('blackoutBtn')?.addEventListener('click', () => document.getElementById('blackoutModal').classList.add('active'));
-document.getElementById('closeBlackoutBtn')?.addEventListener('click', () => document.getElementById('blackoutModal').classList.remove('active'));
-document.getElementById('exitBlackoutBtn')?.addEventListener('click', () => { deactivateBlackout(); document.getElementById('blackoutModal').classList.remove('active'); });
-document.getElementById('confirmBlackoutBtn')?.addEventListener('click', () => { const reason = document.getElementById('blackoutReason').value; activateBlackout(reason); document.getElementById('blackoutModal').classList.remove('active'); });
 document.getElementById('searchInput')?.addEventListener('input', () => renderItems());
 document.getElementById('categoryFilter')?.addEventListener('change', () => renderItems());
 document.getElementById('historySearch')?.addEventListener('input', () => renderHistory());

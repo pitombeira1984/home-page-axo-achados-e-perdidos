@@ -16,8 +16,7 @@
         <header class="header">
             <div class="header-content">
                 <div class="logo">
-                    <div class="logo-icon">🔍</div>
-                    <div class="logo-text">AXO</div>
+                    <div class="logo-img"><img src="./img/img_axo_logo-removebg_SoLogo_Reduzido.png" alt="logo-img"></div>
                 </div>
                 <p class="tagline">Achados e Perdidos · Gestão Inteligente</p>
             </div>
@@ -51,9 +50,6 @@
                 </button>
                 <button class="btn btn-backup" id="backupBtn">
                     <span>💾</span> Backup
-                </button>
-                <button class="btn btn-blackout" id="blackoutBtn">
-                    <span>⚠️</span> Blackout
                 </button>
             </div>
             <div class="search-filter">
@@ -148,7 +144,6 @@
                         <option value="edit">✏️ Edições</option>
                         <option value="delete">🗑️ Exclusões</option>
                         <option value="status">🔄 Mudanças de status</option>
-                        <option value="blackout">⚠️ Blackout</option>
                         <option value="backup">💾 Backup</option>
                     </select>
                     <button class="btn btn-secondary" id="clearHistoryBtn">Limpar histórico</button>
@@ -158,32 +153,6 @@
                     <span>📅 Última semana: <strong id="historyWeekCount">0</strong></span>
                 </div>
                 <div class="history-list" id="historyList"></div>
-            </div>
-        </div>
-
-        <!-- MODAL DE BLACKOUT -->
-        <div class="modal" id="blackoutModal">
-            <div class="modal-content">
-                <div class="modal-header blackout-header">
-                    <h2>⚠️ MODO BLACKOUT</h2>
-                    <button class="modal-close" id="closeBlackoutBtn">&times;</button>
-                </div>
-                <div class="blackout-content">
-                    <div class="blackout-icon">🔒</div>
-                    <p class="blackout-message">
-                        O sistema está em <strong>modo de emergência</strong>. 
-                        Apenas leitura permitida. Novos registros, edições e exclusões 
-                        estão temporariamente bloqueados.
-                    </p>
-                    <div class="blackout-reason">
-                        <label>Motivo do Blackout (opcional):</label>
-                        <textarea id="blackoutReason" rows="3" placeholder="Ex: Manutenção programada, investigação de itens, etc..."></textarea>
-                    </div>
-                    <div class="blackout-actions">
-                        <button class="btn btn-secondary" id="exitBlackoutBtn">🔓 Desativar Blackout</button>
-                        <button class="btn btn-primary" id="confirmBlackoutBtn">⚠️ Ativar Blackout</button>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -206,7 +175,7 @@
                                 <input type="checkbox" id="exportHistory" checked> Histórico de ações
                             </label>
                             <label class="checkbox-label">
-                                <input type="checkbox" id="exportSettings" checked> Configurações (Blackout)
+                                <input type="checkbox" id="exportSettings" checked> Configurações
                             </label>
                         </div>
                         <div class="backup-actions">
@@ -279,14 +248,6 @@
         <div id="loadingOverlay" class="loading-overlay" style="display: none;">
             <div class="loading-spinner"></div>
             <p>Processando... Aguarde</p>
-        </div>
-
-        <!-- INDICADOR VISUAL DE BLACKOUT -->
-        <div id="blackoutOverlay" class="blackout-overlay" style="display: none;">
-            <div class="blackout-badge">
-                <span>⚠️ MODO BLACKOUT ATIVO</span>
-                <small>Sistema em manutenção / emergência</small>
-            </div>
         </div>
     </div>
 
