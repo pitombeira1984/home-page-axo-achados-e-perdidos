@@ -1,10 +1,16 @@
 // ===== AXO - Sistema de Achados e Perdidos =====
-// Versão completa com Histórico Detalhado + Backup
+// Versão completa com Histórico Detalhado + Backup + Tela de Login
 
 let itemsDatabase = [];
 let historyDatabase = [];
 let autoBackupInterval = null;
-let currentUser = 'admin';
+let currentUser = null;
+
+// Credenciais de exemplo
+const validUsers = [
+    { email: 'admin@axo.com', password: '123456', name: 'Administrador' },
+    { email: 'usuario@axo.com', password: '123456', name: 'Usuário' }
+];
 
 // ===== LOADING CONTROL =====
 function showLoading(show, message = 'Processando...') {
@@ -64,6 +70,33 @@ function saveDatabase() {
     }, 0);
 }
 
+// ===== LOGIN =====
+function handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+    
+    const user = validUsers.find(u => u.email === email && u.password === password);
+    
+    if (user) {
+        currentUser = user;
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        showTemporaryMessage(`Bem-vindo, ${user.name}!`, 'success');
+        updateStatsAndRender();
+    } else {
+        showTemporaryMessage('E-mail ou senha incorretos! Use admin@axo.com / 123456', 'error');
+    }
+}
+
+function logout() {
+    currentUser = null;
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('loginForm').reset();
+    showTemporaryMessage('Você saiu do sistema', 'success');
+}
+
 // ===== HISTÓRICO DETALHADO =====
 function addToHistory(actionType, description, itemId = null, extraData = null) {
     const historyEntry = {
@@ -72,7 +105,7 @@ function addToHistory(actionType, description, itemId = null, extraData = null) 
         description: description,
         itemId: itemId,
         timestamp: new Date().toISOString(),
-        user: currentUser,
+        user: currentUser ? currentUser.name : 'admin',
         userAgent: navigator.userAgent.substring(0, 100),
         extraData: extraData
     };
@@ -128,7 +161,7 @@ function renderHistory() {
                     ${getTypeIcon(entry.type)} ${getTypeName(entry.type)}
                 </div>
                 <div class="history-user">
-                    👤 ${entry.user === 'admin' ? 'Administrador' : 'Operador'}
+                    👤 ${escapeHtml(entry.user)}
                     <span>•</span>
                     ${formatDateTime(entry.timestamp)}
                 </div>
@@ -458,7 +491,7 @@ function getChanges(oldObj, newObj) {
 
 function deleteItem(id) {
     const item = itemsDatabase.find(i => i.id === id);
-    if (item) {
+    if (confirm(`Tem certeza que deseja excluir "${item?.name}" permanentemente?`)) {
         itemsDatabase = itemsDatabase.filter(i => i.id !== id);
         addToHistory('delete', `Objeto excluído: "${item.name}"`, id, item);
         saveDatabase();
@@ -515,8 +548,8 @@ function showTemporaryMessage(message, type = 'success') {
     toast.style.bottom = '20px';
     toast.style.left = '50%';
     toast.style.transform = 'translateX(-50%)';
-    toast.style.backgroundColor = type === 'error' ? '#DC2626' : type === 'warning' ? '#F59E0B' : 'var(--axo-blue-electric)';
-    toast.style.color = '#111827';
+    toast.style.backgroundColor = type === 'error' ? '#DC2626' : type === 'warning' ? '#F59E0B' : '#10B981';
+    toast.style.color = '#FFFFFF';
     toast.style.padding = '12px 24px';
     toast.style.borderRadius = '8px';
     toast.style.fontWeight = '600';
@@ -527,6 +560,20 @@ function showTemporaryMessage(message, type = 'success') {
 }
 
 // ===== EVENT LISTENERS =====
+// Login
+document.getElementById('loginForm')?.addEventListener('submit', handleLogin);
+document.getElementById('googleLogin')?.addEventListener('click', () => showTemporaryMessage('Login com Google em desenvolvimento', 'warning'));
+document.getElementById('signupLink')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    showTemporaryMessage('Cadastro em desenvolvimento. Use admin@axo.com / 123456', 'warning');
+});
+document.getElementById('forgotPassword')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    showTemporaryMessage('Recuperação de senha em desenvolvimento', 'warning');
+});
+document.getElementById('logoutHeaderBtn')?.addEventListener('click', logout);
+
+// App
 document.getElementById('openRegisterBtn')?.addEventListener('click', () => openModal(false));
 document.getElementById('closeModalBtn')?.addEventListener('click', closeModal);
 document.getElementById('cancelModalBtn')?.addEventListener('click', closeModal);
