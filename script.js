@@ -1,10 +1,11 @@
 // ===== AXO - Sistema de Achados e Perdidos =====
-// Versão completa com Histórico Detalhado + Backup + Tela de Login
+// Versão completa com Histórico + Backup + Login + Imagens
 
 let itemsDatabase = [];
 let historyDatabase = [];
 let autoBackupInterval = null;
 let currentUser = null;
+let currentPhotoBase64 = null;
 
 // Credenciais de exemplo
 const validUsers = [
@@ -37,9 +38,9 @@ async function loadDatabase() {
             itemsDatabase = JSON.parse(saved);
         } else {
             itemsDatabase = [
-                { id: '1', name: 'iPhone 13 Azul', category: 'Eletrônicos', location: 'Praça de Alimentação', description: 'Capa transparente, película com pequeno arranhão', date: '2024-01-15', status: 'pending' },
-                { id: '2', name: 'Carteira de Couro', category: 'Acessórios', location: 'Estacionamento G2', description: 'Marrom, contém documentos e cartões', date: '2024-01-18', status: 'pending' },
-                { id: '3', name: 'Mochila Escolar', category: 'Acessórios', location: 'Auditório Principal', description: 'Preta, com adesivos de desenhos', date: '2024-01-10', status: 'returned' }
+                { id: '1', name: 'iPhone 13 Azul', category: 'Eletrônicos', location: 'Praça de Alimentação', description: 'Capa transparente', date: '2024-01-15', status: 'pending', photo: null },
+                { id: '2', name: 'Carteira de Couro', category: 'Acessórios', location: 'Estacionamento G2', description: 'Marrom, documentos', date: '2024-01-18', status: 'pending', photo: null },
+                { id: '3', name: 'Mochila Escolar', category: 'Acessórios', location: 'Auditório Principal', description: 'Preta, adesivos', date: '2024-01-10', status: 'returned', photo: null }
             ];
             saveDatabase();
         }
@@ -97,7 +98,7 @@ function logout() {
     showTemporaryMessage('Você saiu do sistema', 'success');
 }
 
-// ===== HISTÓRICO DETALHADO =====
+// ===== HISTÓRICO =====
 function addToHistory(actionType, description, itemId = null, extraData = null) {
     const historyEntry = {
         id: Date.now().toString(36) + Math.random().toString(36).substr(2),
@@ -106,22 +107,15 @@ function addToHistory(actionType, description, itemId = null, extraData = null) 
         itemId: itemId,
         timestamp: new Date().toISOString(),
         user: currentUser ? currentUser.name : 'admin',
-        userAgent: navigator.userAgent.substring(0, 100),
         extraData: extraData
     };
     
     historyDatabase.unshift(historyEntry);
-    
-    if (historyDatabase.length > 1000) {
-        historyDatabase = historyDatabase.slice(0, 1000);
-    }
-    
+    if (historyDatabase.length > 1000) historyDatabase = historyDatabase.slice(0, 1000);
     saveDatabase();
     
     const historyModal = document.getElementById('historyModal');
-    if (historyModal && historyModal.classList.contains('active')) {
-        renderHistory();
-    }
+    if (historyModal && historyModal.classList.contains('active')) renderHistory();
 }
 
 function renderHistory() {
@@ -130,62 +124,29 @@ function renderHistory() {
     const typeFilter = document.getElementById('historyTypeFilter')?.value || 'all';
     
     let filtered = [...historyDatabase];
+    if (searchTerm) filtered = filtered.filter(h => h.description.toLowerCase().includes(searchTerm));
+    if (typeFilter !== 'all') filtered = filtered.filter(h => h.type === typeFilter);
     
-    if (searchTerm) {
-        filtered = filtered.filter(h => 
-            h.description.toLowerCase().includes(searchTerm) ||
-            (h.extraData?.name && h.extraData.name.toLowerCase().includes(searchTerm))
-        );
-    }
-    
-    if (typeFilter !== 'all') {
-        filtered = filtered.filter(h => h.type === typeFilter);
-    }
-    
-    const now = new Date();
-    const weekAgo = new Date(now.setDate(now.getDate() - 7));
+    const weekAgo = new Date(new Date().setDate(new Date().getDate() - 7));
     const weekCount = filtered.filter(h => new Date(h.timestamp) > weekAgo).length;
     
     document.getElementById('historyTotalCount').textContent = filtered.length;
     document.getElementById('historyWeekCount').textContent = weekCount;
     
     if (filtered.length === 0) {
-        historyList.innerHTML = '<div class="empty-history">📭 Nenhum registro encontrado no histórico</div>';
+        historyList.innerHTML = '<div class="empty-history">📭 Nenhum registro encontrado</div>';
         return;
     }
     
     historyList.innerHTML = filtered.map(entry => `
         <div class="history-item-detailed ${entry.type}">
             <div class="history-header-detailed">
-                <div class="history-badge ${entry.type}">
-                    ${getTypeIcon(entry.type)} ${getTypeName(entry.type)}
-                </div>
-                <div class="history-user">
-                    👤 ${escapeHtml(entry.user)}
-                    <span>•</span>
-                    ${formatDateTime(entry.timestamp)}
-                </div>
+                <div class="history-badge ${entry.type}">${getTypeIcon(entry.type)} ${getTypeName(entry.type)}</div>
+                <div class="history-user">👤 ${escapeHtml(entry.user)} • ${formatDateTime(entry.timestamp)}</div>
             </div>
-            <div class="history-details-detailed">
-                ${escapeHtml(entry.description)}
-            </div>
-            ${entry.extraData?.changes ? `
-                <div class="history-changes">
-                    <strong>Alterações:</strong><br>
-                    ${escapeHtml(entry.extraData.changes)}
-                </div>
-            ` : ''}
-            ${entry.extraData?.old && entry.extraData?.new ? `
-                <div class="history-changes">
-                    <strong>Detalhes:</strong><br>
-                    Antes: ${escapeHtml(JSON.stringify(entry.extraData.old))}<br>
-                    Depois: ${escapeHtml(JSON.stringify(entry.extraData.new))}
-                </div>
-            ` : ''}
-            <div class="history-meta">
-                <span>🆔 ID: ${entry.id.substring(0, 8)}...</span>
-                ${entry.itemId ? `<span>📦 Item: ${entry.itemId.substring(0, 8)}...</span>` : ''}
-            </div>
+            <div class="history-details-detailed">${escapeHtml(entry.description)}</div>
+            ${entry.extraData?.changes ? `<div class="history-changes"><strong>Alterações:</strong><br>${escapeHtml(entry.extraData.changes)}</div>` : ''}
+            <div class="history-meta"><span>🆔 ID: ${entry.id.substring(0, 8)}...</span>${entry.itemId ? `<span>📦 Item: ${entry.itemId.substring(0, 8)}...</span>` : ''}</div>
         </div>
     `).join('');
 }
@@ -202,71 +163,48 @@ function getTypeName(type) {
 
 // ===== BACKUP SYSTEM =====
 async function exportBackup(includeItems = true, includeHistory = true, includeSettings = true) {
-    showLoading(true, 'Gerando arquivo de backup...');
-    
+    showLoading(true, 'Gerando backup...');
     try {
         await new Promise(resolve => setTimeout(resolve, 50));
-        
-        const backup = {
-            version: '1.0',
-            timestamp: new Date().toISOString(),
-            data: {}
-        };
-        
+        const backup = { version: '1.0', timestamp: new Date().toISOString(), data: {} };
         if (includeItems) backup.data.items = itemsDatabase;
         if (includeHistory) backup.data.history = historyDatabase;
         if (includeSettings) backup.data.settings = {};
         
-        const backupJson = JSON.stringify(backup, null, 2);
-        const blob = new Blob([backupJson], { type: 'application/json' });
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `axo_backup_${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        
-        addToHistory('backup', `Backup exportado (${includeItems ? 'itens, ' : ''}${includeHistory ? 'histórico, ' : ''}${includeSettings ? 'configurações' : ''})`, null);
-        showTemporaryMessage('✅ Backup exportado com sucesso!', 'success');
+        addToHistory('backup', 'Backup exportado', null);
+        showTemporaryMessage('✅ Backup exportado!', 'success');
     } catch (error) {
-        console.error('Erro ao exportar backup:', error);
-        showTemporaryMessage('❌ Erro ao exportar backup!', 'error');
+        showTemporaryMessage('❌ Erro ao exportar!', 'error');
     } finally {
         showLoading(false);
     }
 }
 
 async function importBackup(file) {
-    showLoading(true, 'Validando arquivo de backup...');
-    
+    showLoading(true, 'Validando backup...');
     try {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
         const text = await file.text();
         const backup = JSON.parse(text);
+        if (!backup.version || !backup.data) throw new Error('Arquivo inválido');
         
-        if (!backup.version || !backup.data) {
-            throw new Error('Arquivo de backup inválido');
-        }
-        
-        const preview = document.getElementById('restorePreview');
-        preview.innerHTML = `
+        document.getElementById('restorePreview').innerHTML = `
             <div class="backup-preview-info">
-                <p><strong>📅 Data do backup:</strong> ${new Date(backup.timestamp).toLocaleString('pt-BR')}</p>
-                <p><strong>📦 Versão:</strong> ${backup.version}</p>
-                <p><strong>📊 Itens:</strong> ${backup.data.items?.length || 0} objetos</p>
-                <p><strong>📋 Histórico:</strong> ${backup.data.history?.length || 0} registros</p>
+                <p>📅 Data: ${new Date(backup.timestamp).toLocaleString('pt-BR')}</p>
+                <p>📦 Itens: ${backup.data.items?.length || 0}</p>
+                <p>📋 Registros: ${backup.data.history?.length || 0}</p>
             </div>
         `;
-        
         window.tempBackup = backup;
         document.getElementById('restoreConfirmModal').classList.add('active');
-        
     } catch (error) {
-        console.error('Erro ao ler backup:', error);
-        showTemporaryMessage('❌ Arquivo de backup inválido ou corrompido!', 'error');
+        showTemporaryMessage('❌ Backup inválido!', 'error');
     } finally {
         showLoading(false);
     }
@@ -274,30 +212,19 @@ async function importBackup(file) {
 
 async function executeRestore() {
     if (!window.tempBackup) return;
-    
-    showLoading(true, 'Restaurando dados...');
-    
+    showLoading(true, 'Restaurando...');
     try {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        
-        const backup = window.tempBackup;
-        
-        if (backup.data.items) itemsDatabase = backup.data.items;
-        if (backup.data.history) historyDatabase = backup.data.history;
-        
+        if (window.tempBackup.data.items) itemsDatabase = window.tempBackup.data.items;
+        if (window.tempBackup.data.history) historyDatabase = window.tempBackup.data.history;
         saveDatabase();
         updateStatsAndRender();
-        
-        addToHistory('backup', `Backup restaurado de ${new Date(backup.timestamp).toLocaleString('pt-BR')}`, null, { restoredItems: itemsDatabase.length });
-        showTemporaryMessage('✅ Backup restaurado com sucesso!', 'success');
-        
+        addToHistory('backup', 'Backup restaurado', null);
+        showTemporaryMessage('✅ Backup restaurado!', 'success');
         document.getElementById('restoreConfirmModal').classList.remove('active');
         document.getElementById('backupModal').classList.remove('active');
         window.tempBackup = null;
-        
     } catch (error) {
-        console.error('Erro ao restaurar backup:', error);
-        showTemporaryMessage('❌ Erro ao restaurar backup!', 'error');
+        showTemporaryMessage('❌ Erro na restauração!', 'error');
     } finally {
         showLoading(false);
     }
@@ -305,112 +232,66 @@ async function executeRestore() {
 
 // ===== BACKUP AUTOMÁTICO =====
 function setupAutoBackup() {
-    const autoBackupEnabled = localStorage.getItem('axo_auto_backup_enabled') === 'true';
-    const autoBackupIntervalValue = parseInt(localStorage.getItem('axo_auto_backup_interval') || '86400000');
-    
-    const autoBackupEnable = document.getElementById('autoBackupEnable');
-    const autoBackupIntervalSelect = document.getElementById('autoBackupInterval');
-    
-    if (autoBackupEnable) {
-        autoBackupEnable.checked = autoBackupEnabled;
-        if (autoBackupEnabled) startAutoBackup(autoBackupIntervalValue);
-    }
-    
-    if (autoBackupIntervalSelect) {
-        autoBackupIntervalSelect.value = autoBackupIntervalValue;
-        autoBackupIntervalSelect.disabled = !autoBackupEnabled;
-    }
+    const enabled = localStorage.getItem('axo_auto_backup_enabled') === 'true';
+    const interval = parseInt(localStorage.getItem('axo_auto_backup_interval') || '86400000');
+    const cb = document.getElementById('autoBackupEnable');
+    const sel = document.getElementById('autoBackupInterval');
+    if (cb) { cb.checked = enabled; if (enabled) startAutoBackup(interval); }
+    if (sel) { sel.value = interval; sel.disabled = !enabled; }
 }
 
 function startAutoBackup(intervalMs) {
     if (autoBackupInterval) clearInterval(autoBackupInterval);
-    
-    autoBackupInterval = setInterval(() => {
-        performAutoBackup();
-    }, intervalMs);
-    
+    autoBackupInterval = setInterval(() => performAutoBackup(), intervalMs);
     localStorage.setItem('axo_auto_backup_enabled', 'true');
     localStorage.setItem('axo_auto_backup_interval', intervalMs);
 }
 
 function stopAutoBackup() {
-    if (autoBackupInterval) {
-        clearInterval(autoBackupInterval);
-        autoBackupInterval = null;
-    }
+    if (autoBackupInterval) { clearInterval(autoBackupInterval); autoBackupInterval = null; }
     localStorage.setItem('axo_auto_backup_enabled', 'false');
 }
 
 async function performAutoBackup() {
-    const backup = {
-        version: '1.0',
-        timestamp: new Date().toISOString(),
-        type: 'auto',
-        data: {
-            items: itemsDatabase,
-            history: historyDatabase.slice(0, 100),
-            settings: {}
-        }
-    };
-    
-    const autoBackups = JSON.parse(localStorage.getItem('axo_auto_backups') || '[]');
-    autoBackups.unshift(backup);
-    
-    while (autoBackups.length > 10) autoBackups.pop();
-    
-    localStorage.setItem('axo_auto_backups', JSON.stringify(autoBackups));
+    const backups = JSON.parse(localStorage.getItem('axo_auto_backups') || '[]');
+    backups.unshift({ version: '1.0', timestamp: new Date().toISOString(), data: { items: itemsDatabase, history: historyDatabase.slice(0, 100) } });
+    while (backups.length > 10) backups.pop();
+    localStorage.setItem('axo_auto_backups', JSON.stringify(backups));
     loadAutoBackupList();
 }
 
 function loadAutoBackupList() {
     const container = document.getElementById('backupFilesList');
     if (!container) return;
-    
-    const autoBackups = JSON.parse(localStorage.getItem('axo_auto_backups') || '[]');
-    
-    if (autoBackups.length === 0) {
-        container.innerHTML = '<p style="color: var(--axo-text-gray);">Nenhum backup automático encontrado.</p>';
-        return;
-    }
-    
-    container.innerHTML = autoBackups.map((backup, index) => `
+    const backups = JSON.parse(localStorage.getItem('axo_auto_backups') || '[]');
+    if (backups.length === 0) { container.innerHTML = '<p>Nenhum backup automático</p>'; return; }
+    container.innerHTML = backups.map((b, i) => `
         <div class="backup-file-item">
-            <div class="backup-file-info">
-                <strong>${new Date(backup.timestamp).toLocaleString('pt-BR')}</strong><br>
-                <small>${backup.data.items?.length || 0} objetos | ${backup.data.history?.length || 0} registros</small>
-            </div>
-            <div class="backup-file-actions">
-                <button class="btn btn-secondary" onclick="restoreAutoBackup(${index})">Restaurar</button>
-            </div>
+            <div class="backup-file-info"><strong>${new Date(b.timestamp).toLocaleString('pt-BR')}</strong><br><small>${b.data.items?.length || 0} objetos</small></div>
+            <div class="backup-file-actions"><button class="btn btn-secondary" onclick="restoreAutoBackup(${i})">Restaurar</button></div>
         </div>
     `).join('');
 }
 
 function restoreAutoBackup(index) {
-    const autoBackups = JSON.parse(localStorage.getItem('axo_auto_backups') || '[]');
-    if (autoBackups[index]) {
-        window.tempBackup = autoBackups[index];
-        const preview = document.getElementById('restorePreview');
-        preview.innerHTML = `
-            <div class="backup-preview-info">
-                <p><strong>📅 Backup automático:</strong> ${new Date(autoBackups[index].timestamp).toLocaleString('pt-BR')}</p>
-                <p><strong>📊 Itens:</strong> ${autoBackups[index].data.items?.length || 0} objetos</p>
-            </div>
-        `;
+    const backups = JSON.parse(localStorage.getItem('axo_auto_backups') || '[]');
+    if (backups[index]) {
+        window.tempBackup = backups[index];
+        document.getElementById('restorePreview').innerHTML = `<div class="backup-preview-info"><p>📅 Backup: ${new Date(backups[index].timestamp).toLocaleString('pt-BR')}</p><p>📦 Itens: ${backups[index].data.items?.length || 0}</p></div>`;
         document.getElementById('restoreConfirmModal').classList.add('active');
     }
 }
 
 // ===== FUNÇÕES PRINCIPAIS =====
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
-function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, function(m) { if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; return m; }); }
-function formatDate(dateString) { if (!dateString) return 'Data não informada'; return new Date(dateString).toLocaleDateString('pt-BR'); }
+function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m])); }
+function formatDate(dateString) { return dateString ? new Date(dateString).toLocaleDateString('pt-BR') : 'Data não informada'; }
 function formatDateTime(dateString) { return new Date(dateString).toLocaleString('pt-BR'); }
 
 function updateStats() {
     document.getElementById('totalItems').textContent = itemsDatabase.length;
-    document.getElementById('pendingItems').textContent = itemsDatabase.filter(item => item.status === 'pending').length;
-    document.getElementById('returnedItems').textContent = itemsDatabase.filter(item => item.status === 'returned').length;
+    document.getElementById('pendingItems').textContent = itemsDatabase.filter(i => i.status === 'pending').length;
+    document.getElementById('returnedItems').textContent = itemsDatabase.filter(i => i.status === 'returned').length;
 }
 
 function updateStatsAndRender() { updateStats(); renderItems(); }
@@ -433,9 +314,8 @@ function renderItems() {
     });
     
     grid.innerHTML = '';
-    
     if (filtered.length === 0) {
-        grid.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><h3>Nenhum objeto encontrado</h3><p>Tente outro termo de busca ou registre um novo item.</p></div>';
+        grid.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><h3>Nenhum objeto encontrado</h3><p>Tente outro termo de busca</p></div>';
         return;
     }
     
@@ -443,42 +323,47 @@ function renderItems() {
         const card = document.createElement('div');
         card.className = 'item-card';
         card.innerHTML = `
-            <div class="card-header"><h3 class="item-name">${escapeHtml(item.name)}</h3><span class="status-badge ${item.status === 'pending' ? 'status-pending' : 'status-returned'}">${item.status === 'pending' ? '⏳ Aguardando' : '✅ Devolvido'}</span></div>
+            ${item.photo ? `<img src="${item.photo}" class="item-photo" alt="${escapeHtml(item.name)}">` : '<div class="item-photo-placeholder">📷</div>'}
+            <div class="card-header">
+                <h3 class="item-name">${escapeHtml(item.name)}</h3>
+                <span class="status-badge ${item.status === 'pending' ? 'status-pending' : 'status-returned'}">${item.status === 'pending' ? '⏳ Pendente' : '✅ Devolvido'}</span>
+            </div>
             <div class="item-category">${item.category}</div>
-            <div class="item-detail"><span>📍</span> <span>${escapeHtml(item.location)}</span></div>
-            <div class="item-detail"><span>📅</span> <span>${formatDate(item.date)}</span></div>
+            <div class="item-detail"><span>📍</span> ${escapeHtml(item.location)}</div>
+            <div class="item-detail"><span>📅</span> ${formatDate(item.date)}</div>
             <div class="card-actions">
                 <button class="btn btn-secondary edit-item" data-id="${item.id}">✏️ Editar</button>
-                <button class="btn ${item.status === 'pending' ? 'btn-primary' : 'btn-secondary'} toggle-status" data-id="${item.id}">${item.status === 'pending' ? '✓ Marcar devolvido' : '↩️ Reabrir'}</button>
+                <button class="btn ${item.status === 'pending' ? 'btn-primary' : 'btn-secondary'} toggle-status" data-id="${item.id}">${item.status === 'pending' ? '✓ Devolver' : '↩️ Reabrir'}</button>
                 <button class="btn btn-secondary delete-item" data-id="${item.id}">🗑️</button>
             </div>
         `;
         grid.appendChild(card);
     });
     
-    document.querySelectorAll('.edit-item').forEach(btn => btn.addEventListener('click', (e) => openEditModal(btn.getAttribute('data-id'))));
-    document.querySelectorAll('.toggle-status').forEach(btn => btn.addEventListener('click', (e) => toggleItemStatus(btn.getAttribute('data-id'))));
-    document.querySelectorAll('.delete-item').forEach(btn => btn.addEventListener('click', (e) => { if (confirm('Tem certeza?')) deleteItem(btn.getAttribute('data-id')); }));
+    document.querySelectorAll('.edit-item').forEach(btn => btn.addEventListener('click', () => openEditModal(btn.dataset.id)));
+    document.querySelectorAll('.toggle-status').forEach(btn => btn.addEventListener('click', () => toggleItemStatus(btn.dataset.id)));
+    document.querySelectorAll('.delete-item').forEach(btn => btn.addEventListener('click', () => { if (confirm('Excluir permanentemente?')) deleteItem(btn.dataset.id); }));
 }
 
-// ===== CRUD =====
+// ===== CRUD COM FOTO =====
 function saveItem(itemData) {
     if (itemData.id) {
         const index = itemsDatabase.findIndex(i => i.id === itemData.id);
         if (index !== -1) {
             const old = { ...itemsDatabase[index] };
-            itemsDatabase[index] = { ...itemsDatabase[index], ...itemData };
-            addToHistory('edit', `Item editado: "${itemData.name}"`, itemData.id, { old, new: itemData, changes: getChanges(old, itemData) });
+            itemsDatabase[index] = { ...itemsDatabase[index], ...itemData, photo: currentPhotoBase64 || itemsDatabase[index].photo };
+            addToHistory('edit', `"${itemData.name}" editado`, itemData.id, { changes: getChanges(old, itemData) });
         }
     } else {
-        const newItem = { id: generateId(), ...itemData, date: itemData.date || new Date().toISOString().split('T')[0] };
+        const newItem = { id: generateId(), ...itemData, date: itemData.date || new Date().toISOString().split('T')[0], photo: currentPhotoBase64 || null };
         itemsDatabase.push(newItem);
-        addToHistory('create', `Novo objeto registrado: "${newItem.name}"`, newItem.id, newItem);
+        addToHistory('create', `Novo objeto: "${newItem.name}"`, newItem.id);
     }
     saveDatabase();
     updateStatsAndRender();
     closeModal();
-    showTemporaryMessage(itemData.id ? '✏️ Item atualizado!' : '✅ Objeto registrado!');
+    showTemporaryMessage(itemData.id ? '✏️ Atualizado!' : '✅ Registrado!');
+    currentPhotoBase64 = null;
 }
 
 function getChanges(oldObj, newObj) {
@@ -491,12 +376,12 @@ function getChanges(oldObj, newObj) {
 
 function deleteItem(id) {
     const item = itemsDatabase.find(i => i.id === id);
-    if (confirm(`Tem certeza que deseja excluir "${item?.name}" permanentemente?`)) {
+    if (item) {
         itemsDatabase = itemsDatabase.filter(i => i.id !== id);
-        addToHistory('delete', `Objeto excluído: "${item.name}"`, id, item);
+        addToHistory('delete', `"${item.name}" excluído`, id);
         saveDatabase();
         updateStatsAndRender();
-        showTemporaryMessage('🗑️ Objeto removido!');
+        showTemporaryMessage('🗑️ Removido!');
     }
 }
 
@@ -505,15 +390,20 @@ function toggleItemStatus(id) {
     if (item) {
         const oldStatus = item.status;
         item.status = item.status === 'pending' ? 'returned' : 'pending';
-        addToHistory('status', `Status alterado: "${item.name}" de ${oldStatus === 'pending' ? 'pendente' : 'devolvido'} para ${item.status === 'pending' ? 'pendente' : 'devolvido'}`, id, { old: oldStatus, new: item.status });
+        addToHistory('status', `"${item.name}" → ${item.status === 'pending' ? 'pendente' : 'devolvido'}`, id);
         saveDatabase();
         updateStatsAndRender();
         showTemporaryMessage(item.status === 'returned' ? '✅ Devolvido!' : '🔄 Reaberto!');
     }
 }
 
-// ===== MODAIS =====
+// ===== MODAIS E FOTO =====
 function openModal(editMode = false, itemData = null) {
+    currentPhotoBase64 = null;
+    document.getElementById('photoPlaceholder').style.display = 'flex';
+    document.getElementById('photoPreview').style.display = 'none';
+    document.getElementById('previewImage').src = '';
+    
     if (editMode && itemData) {
         document.getElementById('modalTitle').textContent = '✏️ Editar objeto';
         document.getElementById('itemId').value = itemData.id;
@@ -523,8 +413,14 @@ function openModal(editMode = false, itemData = null) {
         document.getElementById('itemDescription').value = itemData.description || '';
         document.getElementById('itemDate').value = itemData.date || '';
         document.getElementById('itemStatus').value = itemData.status;
+        if (itemData.photo) {
+            currentPhotoBase64 = itemData.photo;
+            document.getElementById('previewImage').src = itemData.photo;
+            document.getElementById('photoPlaceholder').style.display = 'none';
+            document.getElementById('photoPreview').style.display = 'block';
+        }
     } else {
-        document.getElementById('modalTitle').textContent = '📝 Registrar novo objeto';
+        document.getElementById('modalTitle').textContent = '📝 Registrar objeto';
         document.getElementById('itemForm').reset();
         document.getElementById('itemId').value = '';
         document.getElementById('itemDate').value = new Date().toISOString().split('T')[0];
@@ -533,13 +429,16 @@ function openModal(editMode = false, itemData = null) {
     document.getElementById('itemModal').classList.add('active');
 }
 
-function closeModal() { document.getElementById('itemModal').classList.remove('active'); }
+function closeModal() { 
+    document.getElementById('itemModal').classList.remove('active');
+    currentPhotoBase64 = null;
+}
 function openEditModal(id) { const item = itemsDatabase.find(i => i.id === id); if (item) openModal(true, item); }
 function openHistoryModal() { renderHistory(); document.getElementById('historyModal').classList.add('active'); }
 function closeHistoryModal() { document.getElementById('historyModal').classList.remove('active'); }
 function openBackupModal() { loadAutoBackupList(); document.getElementById('backupModal').classList.add('active'); }
 function closeBackupModal() { document.getElementById('backupModal').classList.remove('active'); }
-function clearHistory() { if (confirm('⚠️ Limpar TODO o histórico?')) { historyDatabase = []; saveDatabase(); renderHistory(); showTemporaryMessage('📋 Histórico limpo!'); } }
+function clearHistory() { if (confirm('Limpar TODO o histórico?')) { historyDatabase = []; saveDatabase(); renderHistory(); showTemporaryMessage('📋 Histórico limpo!'); } }
 
 function showTemporaryMessage(message, type = 'success') {
     const toast = document.createElement('div');
@@ -549,7 +448,7 @@ function showTemporaryMessage(message, type = 'success') {
     toast.style.left = '50%';
     toast.style.transform = 'translateX(-50%)';
     toast.style.backgroundColor = type === 'error' ? '#DC2626' : type === 'warning' ? '#F59E0B' : '#10B981';
-    toast.style.color = '#FFFFFF';
+    toast.style.color = 'white';
     toast.style.padding = '12px 24px';
     toast.style.borderRadius = '8px';
     toast.style.fontWeight = '600';
@@ -559,21 +458,53 @@ function showTemporaryMessage(message, type = 'success') {
     setTimeout(() => toast.remove(), 3000);
 }
 
-// ===== EVENT LISTENERS =====
-// Login
-document.getElementById('loginForm')?.addEventListener('submit', handleLogin);
-document.getElementById('googleLogin')?.addEventListener('click', () => showTemporaryMessage('Login com Google em desenvolvimento', 'warning'));
-document.getElementById('signupLink')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    showTemporaryMessage('Cadastro em desenvolvimento. Use admin@axo.com / 123456', 'warning');
-});
-document.getElementById('forgotPassword')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    showTemporaryMessage('Recuperação de senha em desenvolvimento', 'warning');
-});
-document.getElementById('logoutHeaderBtn')?.addEventListener('click', logout);
+// ===== UPLOAD DE FOTO =====
+function setupPhotoUpload() {
+    const uploadArea = document.getElementById('photoUploadArea');
+    const fileInput = document.getElementById('itemPhoto');
+    const placeholder = document.getElementById('photoPlaceholder');
+    const preview = document.getElementById('photoPreview');
+    const previewImg = document.getElementById('previewImage');
+    const removeBtn = document.getElementById('removePhotoBtn');
+    
+    uploadArea.addEventListener('click', () => fileInput.click());
+    
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file && (file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/jpg')) {
+            if (file.size > 5 * 1024 * 1024) {
+                showTemporaryMessage('Arquivo muito grande! Max 5MB', 'error');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                currentPhotoBase64 = event.target.result;
+                previewImg.src = currentPhotoBase64;
+                placeholder.style.display = 'none';
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        } else {
+            showTemporaryMessage('Formato inválido! Use JPG ou PNG', 'error');
+        }
+    });
+    
+    removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        currentPhotoBase64 = null;
+        previewImg.src = '';
+        placeholder.style.display = 'flex';
+        preview.style.display = 'none';
+        fileInput.value = '';
+    });
+}
 
-// App
+// ===== EVENT LISTENERS =====
+document.getElementById('loginForm')?.addEventListener('submit', handleLogin);
+document.getElementById('googleLogin')?.addEventListener('click', () => showTemporaryMessage('Google em desenvolvimento', 'warning'));
+document.getElementById('signupLink')?.addEventListener('click', (e) => { e.preventDefault(); showTemporaryMessage('Use admin@axo.com / 123456', 'warning'); });
+document.getElementById('forgotPassword')?.addEventListener('click', (e) => { e.preventDefault(); showTemporaryMessage('Use admin@axo.com / 123456', 'warning'); });
+document.getElementById('logoutHeaderBtn')?.addEventListener('click', logout);
 document.getElementById('openRegisterBtn')?.addEventListener('click', () => openModal(false));
 document.getElementById('closeModalBtn')?.addEventListener('click', closeModal);
 document.getElementById('cancelModalBtn')?.addEventListener('click', closeModal);
@@ -583,10 +514,10 @@ document.getElementById('closeHistoryBtn')?.addEventListener('click', closeHisto
 document.getElementById('clearHistoryBtn')?.addEventListener('click', clearHistory);
 document.getElementById('backupBtn')?.addEventListener('click', openBackupModal);
 document.getElementById('closeBackupBtn')?.addEventListener('click', closeBackupModal);
-document.getElementById('exportBackupBtn')?.addEventListener('click', () => { const includeItems = document.getElementById('exportItems').checked; const includeHistory = document.getElementById('exportHistory').checked; const includeSettings = document.getElementById('exportSettings').checked; exportBackup(includeItems, includeHistory, includeSettings); });
+document.getElementById('exportBackupBtn')?.addEventListener('click', () => exportBackup(true, true, true));
 document.getElementById('exportFullBackupBtn')?.addEventListener('click', () => exportBackup(true, true, true));
 document.getElementById('selectRestoreBtn')?.addEventListener('click', () => document.getElementById('restoreFileInput').click());
-document.getElementById('restoreFileInput')?.addEventListener('change', (e) => { if (e.target.files[0]) { importBackup(e.target.files[0]); e.target.value = ''; } });
+document.getElementById('restoreFileInput')?.addEventListener('change', (e) => { if (e.target.files[0]) importBackup(e.target.files[0]); });
 document.getElementById('cancelRestoreBtn')?.addEventListener('click', () => { document.getElementById('restoreConfirmModal').classList.remove('active'); window.tempBackup = null; });
 document.getElementById('executeRestoreBtn')?.addEventListener('click', executeRestore);
 document.getElementById('closeRestoreConfirmBtn')?.addEventListener('click', () => { document.getElementById('restoreConfirmModal').classList.remove('active'); window.tempBackup = null; });
@@ -596,9 +527,21 @@ document.getElementById('searchInput')?.addEventListener('input', () => renderIt
 document.getElementById('categoryFilter')?.addEventListener('change', () => renderItems());
 document.getElementById('historySearch')?.addEventListener('input', () => renderHistory());
 document.getElementById('historyTypeFilter')?.addEventListener('change', () => renderHistory());
-document.getElementById('itemForm')?.addEventListener('submit', (e) => { e.preventDefault(); saveItem({ id: document.getElementById('itemId').value || null, name: document.getElementById('itemName').value.trim(), category: document.getElementById('itemCategory').value, location: document.getElementById('itemLocation').value.trim(), description: document.getElementById('itemDescription').value.trim(), date: document.getElementById('itemDate').value, status: document.getElementById('itemStatus').value }); });
+document.getElementById('itemForm')?.addEventListener('submit', (e) => { 
+    e.preventDefault(); 
+    saveItem({ 
+        id: document.getElementById('itemId').value || null, 
+        name: document.getElementById('itemName').value.trim(), 
+        category: document.getElementById('itemCategory').value, 
+        location: document.getElementById('itemLocation').value.trim(), 
+        description: document.getElementById('itemDescription').value.trim(), 
+        date: document.getElementById('itemDate').value, 
+        status: document.getElementById('itemStatus').value 
+    }); 
+});
 
 document.querySelectorAll('.modal').forEach(modal => { modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('active'); }); });
 
-// ===== INICIALIZAÇÃO =====
+// Inicialização
+setupPhotoUpload();
 loadDatabase();
